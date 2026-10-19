@@ -1,0 +1,15 @@
+services:
+  sinner:
+    build: .
+    env_file: .env
+    restart: unless-stopped
+    init: true
+    read_only: true
+    volumes:
+      - sinner-preferences:/app/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+volumes:
+  sinner-preferences:

@@ -1,0 +1,16 @@
+.git
+node_modules
+dist
+.deploy
+.runtime
+src
+.venv
+.env
+data
+tests
+docs
+__pycache__
+*.egg-info
+.pytest_cache
+.ruff_cache
+*.sqlite*

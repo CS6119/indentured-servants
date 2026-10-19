@@ -1,0 +1,27 @@
+services:
+  raffleye:
+    build: .
+    image: raffleye:${RAFFLEYE_RELEASE:-local}
+    command: ["bot"]
+    env_file: .env
+    environment:
+      RAFFLEYE_DB_PATH: /app/data/live.sqlite3
+      RAFFLEYE_SCREENSHOT_BROWSER_CHANNEL: ""
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m
+    shm_size: 256m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "3"

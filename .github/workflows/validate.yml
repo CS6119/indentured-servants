@@ -1,0 +1,47 @@
+name: Validate both bots
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  raffleye:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: RAFFLEYE
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.2'
+          cache: npm
+          cache-dependency-path: RAFFLEYE/package-lock.json
+      - run: npm ci
+      - run: npm run validate
+      - run: npm run demo
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: RAFFLEYE/requirements*.txt
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pip install --no-deps -e .
+      - run: ruff check src tests
+      - run: ruff format --check src tests
+      - run: pytest -q
+      - run: raffleye demo
+      - run: docker build -t raffleye:test .
+      - run: docker run --rm raffleye:test demo
+  echoveil:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Echoveil
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: Echoveil/package-lock.json
+      - run: npm ci
+      - run: npm run validate

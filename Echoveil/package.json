@@ -1,0 +1,24 @@
+{
+  "name": "sinner-confessions",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc --noEmit -p tsconfig.json && eslint app test",
+    "validate": "npm run check && npm run build && npm test",
+    "start": "node --env-file=.env dist/index.js",
+    "register": "node --env-file=.env dist/register.js",
+    "test": "vitest run"
+  },
+  "dependencies": { "discord.js": "14.27.0" },
+  "devDependencies": {
+    "@eslint/js": "9.39.1",
+    "@types/node": "22.19.0",
+    "eslint": "9.39.1",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.48.0",
+    "vitest": "4.1.11"
+  }
+}
