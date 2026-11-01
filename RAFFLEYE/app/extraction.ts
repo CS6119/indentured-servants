@@ -1,4 +1,5 @@
-import { GIVEAWAY_MARKER, profileQualified } from './discovery.js';
+import { GIVEAWAY_MARKER, giveawayQuantity, numberedGachaGiveaway, profileQualified } from './discovery.js';
+import type { GiveawayTopic } from './discovery.js';
 import { claim, emptyExtraction, grounded, timeKeys, unknown } from './models.js';
 import type { Claim, Extraction, Post } from './models.js';
 import { resolvedTimes, labelledTimes } from './timeparse.js';
@@ -43,15 +44,19 @@ export function entryRequirements(text: string): Claim<string[]> {
   return selected.length ? claim(selected, text.slice(offsets[0]![0], offsets.at(-1)![1]), 'high') : unknown();
 }
 export class RulesExtractor implements Extractor {
+  constructor(readonly topic: GiveawayTopic = 'all') {}
   async extract(post: Post): Promise<Extraction> {
     const text = post.text, values = emptyExtraction();
     const closure = closureSignal(text);
     if (closure) { values.is_giveaway = claim(false, closure.evidence, 'high'); values.announcement = claim(closure.state, closure.evidence, 'high'); return values; }
+    if (this.topic === 'gacha' && !numberedGachaGiveaway(post)) return values;
+    const quantityText = text.replace(/https?:\/\/\S+|@[A-Za-z0-9_]+/g, match => ' '.repeat(match.length));
+    const quantity = this.topic === 'gacha' ? giveawayQuantity(quantityText) : undefined;
     const marker = GIVEAWAY_MARKER.exec(text);
     if (!marker && !profileQualified(post)) return values;
     const signal = /to enter|enter now|how to (?:enter|participate)|rules\s*:|follow (?:me|@)|(?:like|rt|retweet|repost)\s+(?:and|&|\+)\s+(?:like|rt|retweet|repost)|(?:prizes?|deadline|ends?|starts?)\s*[:：]|coming soon|stay tuned|giveaway (?:has )?(?:ended|closed|cancelled|canceled)|參加方式|抽獎辦法|獎品|奖品|即將|预告|預告|抽獎已結束|取消抽獎/i.exec(text);
-    if (!signal) return values;
-    values.is_giveaway = claim(true, marker?.[0] ?? signal[0]);
+    if (!signal && !quantity) return values;
+    values.is_giveaway = claim(true, marker?.[0] ?? signal![0]);
     for (const [state, pattern] of [
       ['cancelled', /cancelled|canceled|取消抽獎/i],
       ['ended', /giveaway (?:has )?(?:ended|closed)|抽獎已結束/i],
@@ -63,7 +68,10 @@ export class RulesExtractor implements Extractor {
     }
     const winners = /(\d+)\s*(?:winners?|名得獎者|位得獎者)/i.exec(text);
     if (winners) values.winner_count = claim(Number(winners[1]), winners[0], 'high');
+    if (quantity?.winnerCount) values.winner_count = claim(quantity.winnerCount, quantity.evidence, 'high');
     values.prizes = prizeClaim(text);
+    const prizeQuantity = this.topic === 'gacha' ? giveawayQuantity(quantityText, 'prize') : undefined;
+    if (values.prizes.value === null && prizeQuantity?.prize) values.prizes = claim([prizeQuantity.prize], prizeQuantity.evidence, 'high');
     const sponsor = /(?:sponsored by|sponsor(?! website)|贊助(?!網站))\s*[:：]?\s*([^\n]+)/i.exec(text);
     if (sponsor) {
       let name = sponsor[1]!.trim();

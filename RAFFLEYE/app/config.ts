@@ -16,7 +16,7 @@ const amount = (fallback: number) => z.coerce.number().finite().min(0).default(f
 export const SettingsSchema = z.object({
   source: z.enum(['mock', 'x', 'apify']).default('mock'),
   extractor: z.enum(['rules', 'openai']).default('rules'),
-  giveaway_topic: z.enum(['all', 'wuwa']).default('all'),
+  giveaway_topic: z.enum(['all', 'wuwa', 'gacha']).default('all'),
   profile_watch_limit: integer(5, 0, 20),
   notification_interval_seconds: integer(300, 60, 86400),
   post_screenshots: bool(false),

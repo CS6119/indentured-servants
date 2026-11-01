@@ -20,21 +20,21 @@ export class Service {
   constructor(readonly store: Store, readonly settings: Settings, options: { fetch?: Fetcher; clock?: () => number; assertOwner?: () => void; signal?: AbortSignal } = {}) {
     this.http = new HTTP(store, settings, options.fetch, options.clock, options.assertOwner, options.signal);
     this.source = settings.source === 'x' ? new XSource(this.http, settings) : settings.source === 'apify' ? new ApifySource(this.http, settings) : new MockSource();
-    this.extractor = settings.extractor === 'openai' ? new OpenAIExtractor(this.http, settings) : new RulesExtractor();
+    this.extractor = settings.extractor === 'openai' ? new OpenAIExtractor(this.http, settings) : new RulesExtractor(settings.giveaway_topic);
     if (settings.apify_fallback) this.fallback = new ApifySource(this.http, settings);
     store.addQuery('global', scopedQuery(settings.global_query, settings.giveaway_topic), 2, settings.global_interval_seconds);
     store.reconcileClosures();
   }
   queryText(query: Query): string {
-    if (/^(profile|watch):/.test(query.key) && this.store.meta('profile:' + query.key.split(':')[1]) === 'eligible') return query.query + (query.query.includes('-is:reply') ? '' : ' -is:reply');
+    if (this.settings.giveaway_topic === 'wuwa' && /^(profile|watch):/.test(query.key) && this.store.meta('profile:' + query.key.split(':')[1]) === 'eligible') return query.query + (query.query.includes('-is:reply') ? '' : ' -is:reply');
     return scopedQuery(query.query, this.settings.giveaway_topic);
   }
   scanKey(query: Query): string { return 'scan:' + sha256(`${this.source.name}:${this.settings.x_search_mode}:${this.queryText(query)}`); }
   observeProfile(post: Post): void {
-    if (this.settings.giveaway_topic !== 'wuwa') return;
+    if (this.settings.giveaway_topic === 'all') return;
     const key = 'profile:' + post.author.toLowerCase();
     if (this.store.meta('profile_blocked:' + post.author.toLowerCase()) === 'true') return;
-    if (!profileQualified(post)) {
+    if (!profileQualified(post, this.settings.giveaway_topic)) {
       if (post.profile_fetched) { this.store.setMeta(key, 'ineligible'); this.store.db.prepare('DELETE FROM queries WHERE key=?').run(key); }
       return;
     }
@@ -112,7 +112,7 @@ export class Service {
         if (!matchesTopic(post, this.settings.giveaway_topic)) { this.store.markFiltered(post.id); continue; }
         try {
           const extraction = await this.extractor.extract(post);
-          this.store.saveExtraction(post, extraction, now, this.settings.ending_soon_minutes);
+          this.store.saveExtraction(post, extraction, now, this.settings.ending_soon_minutes, this.settings.giveaway_topic);
           this.store.setMeta('extraction_warning', '');
         } catch (error) {
           if (error instanceof BudgetExceeded || (error instanceof ProviderError && ['ai:cooldown', 'ai:http_429', 'ai:http_401', 'ai:http_402', 'ai:http_403'].includes(error.code))) {

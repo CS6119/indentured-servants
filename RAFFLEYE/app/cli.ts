@@ -41,9 +41,9 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
       await store.db.backup(destination); log('backup_complete'); return;
     }
     if (command === 'reprocess') {
-      const extractor = new RulesExtractor();
+      const extractor = new RulesExtractor(settings.giveaway_topic);
       const posts = store.db.prepare('SELECT body FROM posts').all() as { body: string }[];
-      for (const item of posts) { lease.assert(); const post = parsePost(item.body); if (matchesTopic(post, settings.giveaway_topic)) store.saveExtraction(post, await extractor.extract(post), Date.now(), settings.ending_soon_minutes); }
+      for (const item of posts) { lease.assert(); const post = parsePost(item.body); if (matchesTopic(post, settings.giveaway_topic)) store.saveExtraction(post, await extractor.extract(post), Date.now(), settings.ending_soon_minutes, settings.giveaway_topic); }
       for (const item of store.list(10000, row => visible(row, settings.giveaway_topic))) store.queue(item.id, item.revision);
       log('reprocessed', { posts: posts.length }); return;
     }

@@ -1,7 +1,8 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, StringSelectMenuBuilder, escapeMarkdown } from 'discord.js';
 import type { APIEmbed } from 'discord.js';
-import { matchesTopic } from './discovery.js';
-import { instant, parseExtraction, parsePost, postUrl, qualified, terminal, timeKeys } from './models.js';
+import { matchesTopic, qualifiesForFeed } from './discovery.js';
+import type { GiveawayTopic } from './discovery.js';
+import { instant, parseExtraction, parsePost, postUrl, terminal, timeKeys } from './models.js';
 import type { State } from './models.js';
 import type { GiveawayRow } from './storage.js';
 import { labelledTimes, unresolvedTimeReason, timezoneNote } from './timeparse.js';
@@ -12,8 +13,8 @@ export function clean(value: unknown, limit = 700): string {
   const text = Array.isArray(value) ? value.join('\n') : String(value ?? 'Not stated');
   return escapeMarkdown(text).replace(/@(everyone|here)/gi, '@\u200b$1').slice(0, limit);
 }
-export function visible(row: GiveawayRow, topic: 'wuwa' | 'all'): boolean {
-  try { return qualified(parseExtraction(JSON.parse(row.extraction))) && matchesTopic(parsePost(row.post), topic); }
+export function visible(row: GiveawayRow, topic: GiveawayTopic): boolean {
+  try { return qualifiesForFeed(parsePost(row.post), parseExtraction(JSON.parse(row.extraction)), topic); }
   catch { return false; }
 }
 export function compactUtc(value: string): string { return new Date(instant(value)).toISOString().replace('T', ' ').slice(0, 16) + ' UTC'; }
@@ -30,9 +31,9 @@ export function serverClocks(value: string): string[] {
     `America · ${fixedClock(value, -5)} (UTC−5)`,
   ];
 }
-export function timestamp(value: string, relative = true): string {
+export function timestamp(value: string, relative = true, wuwaClocks = true): string {
   const seconds = Math.floor(instant(value) / 1000);
-  return [compactUtc(value), ...serverClocks(value), `Local · <t:${seconds}:f>${relative ? ` (<t:${seconds}:R>)` : ''}`].join('\n');
+  return [compactUtc(value), ...(wuwaClocks ? serverClocks(value) : [`JST · ${fixedClock(value, 9)} (UTC+9)`]), `Local · <t:${seconds}:f>${relative ? ` (<t:${seconds}:R>)` : ''}`].join('\n');
 }
 export function giveawayEmbed(row: GiveawayRow): EmbedBuilder {
   const post = parsePost(row.post), extraction = parseExtraction(JSON.parse(row.extraction));
@@ -45,7 +46,7 @@ export function giveawayEmbed(row: GiveawayRow): EmbedBuilder {
   let hasTiming = false;
   for (const key of timeKeys) {
     const value = extraction[key].value;
-    if (value) { const note = timezoneNote(extraction[key].evidence ?? '', post.text, post.author_location); lines.push(`**${names[key]}** · ${timestamp(value, row.status !== 'cancelled')}${note ? '\n' + clean(note, 200) : ''}`); hasTiming = true; }
+    if (value) { const note = timezoneNote(extraction[key].evidence ?? '', post.text, post.author_location); lines.push(`**${names[key]}** · ${timestamp(value, row.status !== 'cancelled', matchesTopic(post, 'wuwa'))}${note ? '\n' + clean(note, 200) : ''}`); hasTiming = true; }
     else if (timing[key].length) {
       const raw = timing[key].map(item => item.raw).join(' / ');
       lines.push(`**${names[key]}** · ${clean(raw, 160)} — ${unresolvedTimeReason(raw, post.text)}`); hasTiming = true;
@@ -89,7 +90,7 @@ export function detailEmbed(row: GiveawayRow, section: DetailSection = 'entry'):
       const value = data[key].value;
       const raw = stated[key].map(item => item.raw).join(' / ');
       const note = timezoneNote(data[key].evidence ?? '', post.text, post.author_location);
-      embed.addFields({ name: { starts_at: 'Starts', deadline_at: 'Entry deadline', announcement_at: 'Scheduled announcement' }[key], value: value ? timestamp(value, row.status !== 'cancelled') + (note ? '\n' + clean(note, 200) : '') : raw ? clean(raw, 300) + '\n' + unresolvedTimeReason(raw, post.text) : missing });
+      embed.addFields({ name: { starts_at: 'Starts', deadline_at: 'Entry deadline', announcement_at: 'Scheduled announcement' }[key], value: value ? timestamp(value, row.status !== 'cancelled', matchesTopic(post, 'wuwa')) + (note ? '\n' + clean(note, 200) : '') : raw ? clean(raw, 300) + '\n' + unresolvedTimeReason(raw, post.text) : missing });
     }
     embed.setFooter({ text: 'Same moment in every clock. Server clocks use fixed offsets; Local follows your Discord timezone.' });
   } else if (section === 'sponsors') {

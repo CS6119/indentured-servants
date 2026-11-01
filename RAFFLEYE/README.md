@@ -1,6 +1,6 @@
 # RAFFLEYE
 
-A TypeScript Discord bot that discovers Wuthering Waves giveaways on X and posts compact giveaway cards. Node.js 22.12+ is required. Python under `src/` is retained as the pre-migration reference, not a second production worker.
+A TypeScript Discord bot that discovers gacha-related giveaways on X and posts compact giveaway cards. Node.js 22.12+ is required. Python under `src/` is retained as the pre-migration reference, not a second production worker.
 
 ## Run locally
 
@@ -34,9 +34,11 @@ Screenshots show the official public X embed from its author through its timesta
 
 ## Qualification and discovery
 
-A post needs giveaway/entry evidence AND a concrete prize. A giveaway keyword, winner count, purchase price, vague teaser or TBD reward alone is rejected. Rules extraction recognizes named prizes and common quantified Lunite, Astrite, monthly-pass and gift-card offers. Multiple prizes are independent of winner count. Every extracted claim retains its contiguous source evidence; unknowns stay explicit.
+Every extracted claim retains its contiguous source evidence; unknowns stay explicit. Multiple prizes are independent of winner count. In the legacy `all` and `wuwa` modes, a post needs giveaway/entry evidence AND a concrete prize. The `gacha` mode uses the numeric eligibility rule below.
 
-The live topic is WuWa, including related hashtags. Relevant author names and bios can qualify a post for topic matching. Bios mentioning both WuWa and giveaways may receive automatic hourly watches, capped at five. This occurs after encountering an account in search; it is not an exhaustive profile directory search. Every resulting post still needs entry evidence and a concrete reward.
+The live TypeScript topic is `gacha`. Author names/bios or post text must identify gacha or a recognized game, such as WuWa, Genshin, Honkai, Zenless Zone Zero, NIKKE, Arknights, Fate/Grand Order, Blue Archive, or other games listed in `app/discovery.ts`. The post itself must contain `giveaway`/`giveaways` and a positive numeric prize amount, supported reward quantity, or winner count. Examples: `5 Welkins giveaway`, `Giveaway: $50`, and `Giveaway — 3 winners`. Dates, URLs, follower milestones, entry fees, and numbered instructions alone do not qualify. A winner count can qualify even when the prize is unstated; the bot leaves the prize unknown rather than inventing it. Ended/results/cancelled posts are not introduced as new giveaways.
+
+Global search is broad enough to find giveaways whose game context appears only in the author's profile. Returned profiles are checked locally; X search does not search author bios. Relevant profiles may receive automatic hourly watches, still capped at five. This is not exhaustive discovery of every gacha account: unknown game names, image-only information, and unrecognized reward wording may be missed. Explicit account watches can improve coverage but do not bypass the post filter. Existing pacing and spending limits remain in force. `wuwa` and `all` modes retain the older concrete-prize requirement; the Python reference does not implement the new `gacha` mode.
 
 Official X is the primary live provider. The first/deep scan covers six days; completed deep scans repeat after 24 hours. Subsequent scans overlap recent coverage. Raw pages and pagination are committed together before advancing coverage. Recent-search retention limits recovery after long outages; coverage warnings remain visible. Full archive mode requires the appropriate X access and configured window. Image-only details and unrecognized wording may be missed.
 

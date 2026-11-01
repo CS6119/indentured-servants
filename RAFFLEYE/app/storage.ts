@@ -2,7 +2,9 @@ import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { campaignHash, contentHash, grounded, parseExtraction, parsePost, qualified, statusOf, terminal } from './models.js';
+import { campaignHash, contentHash, grounded, parseExtraction, parsePost, statusOf, terminal } from './models.js';
+import { qualifiesForFeed } from './discovery.js';
+import type { GiveawayTopic } from './discovery.js';
 import type { Extraction, Post, State } from './models.js';
 import { SafeError } from './log.js';
 import { closureSignal, linkedPosts } from './lifecycle.js';
@@ -68,6 +70,8 @@ export class Store {
   addQuery(key: string, query: string, priority: number, interval: number): void {
     this.db.prepare(`INSERT INTO queries(key,query,priority,interval_s) VALUES (?,?,?,?) ON CONFLICT(key) DO UPDATE SET
       cursor=CASE WHEN queries.query=excluded.query THEN queries.cursor ELSE NULL END,
+      next_due=CASE WHEN queries.query=excluded.query THEN queries.next_due ELSE 0 END,
+      error=CASE WHEN queries.query=excluded.query THEN queries.error ELSE NULL END,
       query=excluded.query,priority=excluded.priority,interval_s=excluded.interval_s`).run(key, query, priority, interval);
   }
   queries(): Query[] { return this.db.prepare('SELECT * FROM queries ORDER BY priority,key').all() as Query[]; }
@@ -118,11 +122,11 @@ export class Store {
       this.db.prepare(`INSERT INTO outbox(channel_id,post_id,revision) VALUES (?,?,?) ON CONFLICT(channel_id,post_id) DO UPDATE SET revision=excluded.revision,attempts=0,available=0,error=NULL`).run(channelId, id, revision);
     }
   }
-  saveExtraction(post: Post, extraction: Extraction, now: number, endingMinutes: number): void {
+  saveExtraction(post: Post, extraction: Extraction, now: number, endingMinutes: number, topic: GiveawayTopic = 'all'): void {
     extraction = grounded(extraction, post);
     this.transaction(() => {
       this.markFiltered(post.id);
-      if (!qualified(extraction)) { this.db.prepare('DELETE FROM outbox WHERE post_id=?').run(post.id); this.db.prepare('DELETE FROM giveaways WHERE id=?').run(post.id); return; }
+      if (!qualifiesForFeed(post, extraction, topic)) { this.db.prepare('DELETE FROM outbox WHERE post_id=?').run(post.id); this.db.prepare('DELETE FROM giveaways WHERE id=?').run(post.id); return; }
       const hash = contentHash(post);
       if (this.db.prepare('SELECT 1 FROM giveaways WHERE hash=? AND id<>?').get(hash, post.id)) return;
       const others = this.db.prepare("SELECT post FROM giveaways WHERE json_extract(post,'$.author')=? COLLATE NOCASE AND id<>?").all(post.author, post.id) as { post: string }[];
